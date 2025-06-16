@@ -1,12 +1,12 @@
 package br.com.wslima.javaspringbootrestapi.persistence.model;
 
+import br.com.wslima.javaspringbootrestapi.commons.enums.ERole;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.UuidGenerator;
 
-import javax.management.relation.Role;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -17,8 +17,8 @@ import java.util.UUID;
 public class User {
 
     @Id
-    @UuidGenerator(style = UuidGenerator.Style.AUTO)
-    @Getter @Setter
+    @GeneratedValue
+    @UuidGenerator
     @Column(name = "uuid", updatable = false, nullable = false, unique = true)
     private UUID uuid;
 
@@ -31,6 +31,6 @@ public class User {
 
     @ElementCollection(fetch = FetchType.EAGER)
     @Enumerated(EnumType.STRING)
-    private Set<Role> roles = new HashSet<>();
+    private Set<ERole> roles = new HashSet<>();
 
 }
