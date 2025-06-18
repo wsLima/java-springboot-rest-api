@@ -1,6 +1,8 @@
 spring:
   application:
     name: java-springboot-rest-api
+    profiles:
+      active: dev
 
 jwt:
   secret: a07f3f4fc03a3efe99f52ddd6256dc2c3e78c393086cf19edf648d5721706be6
