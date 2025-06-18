@@ -6,6 +6,7 @@ import br.com.wslima.javaspringbootrestapi.persistence.model.User;
 import br.com.wslima.javaspringbootrestapi.persistence.repository.UserRepository;
 import br.com.wslima.javaspringbootrestapi.rest.dto.login.LoginRequest;
 import br.com.wslima.javaspringbootrestapi.rest.dto.login.LoginResponse;
+import br.com.wslima.javaspringbootrestapi.rest.dto.user.CreateUserDTO;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -54,14 +55,15 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<String> register(@RequestBody LoginRequest loginRequest) {
-        if (userRepository.findByEmail(loginRequest.email()).isPresent()) {
+    public ResponseEntity<String> register(@RequestBody CreateUserDTO createUserDTO) {
+        if (userRepository.findByEmail(createUserDTO.email()).isPresent()) {
             return ResponseEntity.badRequest().body("E-mail já cadastrado.");
         }
 
         User user = new User();
-        user.setEmail(loginRequest.email());
-        user.setPassword(passwordEncoder.encode(loginRequest.password()));
+        user.setEmail(createUserDTO.email());
+        user.setName(createUserDTO.name());
+        user.setPassword(passwordEncoder.encode(createUserDTO.password()));
         user.setRoles(Set.of(ERole.USER)); // Por padrão, todo novo usuário é USER
 
         userRepository.save(user);
