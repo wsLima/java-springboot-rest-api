@@ -5,5 +5,6 @@ spring:
       active: dev
 
 jwt:
-  secret: a07f3f4fc03a3efe99f52ddd6256dc2c3e78c393086cf19edf648d5721706be6
-  expirationMs: 86400000
+  secret: 1w2e3r4t5y6u7i8o9p0q1w2e3r4t5y6u7i8o9p0q1w2e3r4t5y6u7i8o9p0q1w2
+  expirationMs: 7200000 # Expira em 2h
+  refreshExpirationMs: 604800000 # Expira em 7 dias
