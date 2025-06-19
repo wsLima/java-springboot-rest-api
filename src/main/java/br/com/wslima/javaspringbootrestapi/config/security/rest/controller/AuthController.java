@@ -1,5 +1,6 @@
 package br.com.wslima.javaspringbootrestapi.config.security.rest.controller;
 
+import br.com.wslima.javaspringbootrestapi.commons.exceptions.*;
 import br.com.wslima.javaspringbootrestapi.config.security.JwtUtils;
 import br.com.wslima.javaspringbootrestapi.commons.enums.ERole;
 import br.com.wslima.javaspringbootrestapi.config.security.persistence.model.RefreshToken;
@@ -57,12 +58,12 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest, HttpServletRequest request) {
+    public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest, HttpServletRequest request) throws Exception {
         String ip = request.getRemoteAddr();
 
         if (loginAttemptService.isBlocked(ip)) {
             logger.warn("IP bloqueado por excesso de tentativas: {}", ip);
-            return ResponseEntity.status(429).body(new LoginResponse(null, "Muitas tentativas. Tente novamente mais tarde."));
+            throw new TooManyRequestsException("Muitas tentativas. Tente novamente mais tarde.");
         }
 
         try {
@@ -79,7 +80,7 @@ public class AuthController {
             String accessToken = jwtUtils.generateAccessToken(userDetails);
 
             User user = userRepository.findByEmail(userDetails.getUsername())
-                    .orElseThrow(() -> new IllegalStateException("Usuário autenticado não encontrado na base de dados."));
+                    .orElseThrow(() -> new NotFoundException("Usuário não encontrado na base de dados."));
 
             RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
 
@@ -88,11 +89,11 @@ public class AuthController {
         } catch (BadCredentialsException ex) {
             loginAttemptService.loginFailed(ip);
             logger.warn("Tentativa de login inválida para o e-mail: {}", loginRequest.email());
-            return ResponseEntity.status(401).body(new LoginResponse(null, "Credenciais inválidas."));
+            throw new UnauthorizedException("Credenciais inválidas.");
         } catch (Exception ex) {
             loginAttemptService.loginFailed(ip);
             logger.error("Erro inesperado durante login: {}", ex.getMessage(), ex);
-            return ResponseEntity.status(500).body(new LoginResponse(null, "Erro interno no servidor. Tente novamente mais tarde."));
+            throw new Exception( "Erro interno no servidor. Tente novamente mais tarde.");
         }
     }
 
@@ -102,7 +103,7 @@ public class AuthController {
 
         if (loginAttemptService.isBlocked(ip)) {
             logger.warn("IP bloqueado por excesso de tentativas (refresh): {}", ip);
-            return ResponseEntity.status(429).body(new RefreshTokenResponse("Muitas tentativas. Tente novamente mais tarde.", null));
+            throw new TooManyRequestsException("Muitas tentativas. Tente novamente mais tarde.");
         }
 
         try {
@@ -110,7 +111,7 @@ public class AuthController {
 
             if (refreshTokenService.isTokenExpired(refreshToken)) {
                 logger.warn("Refresh token expirado: {}", request.refreshToken());
-                return ResponseEntity.status(403).body(new RefreshTokenResponse("Refresh token expirado.", null));
+                throw new BusinessException("Refresh token expirado.");
             }
 
             User user = refreshToken.getUser();
@@ -125,11 +126,15 @@ public class AuthController {
         } catch (IllegalArgumentException ex) {
             loginAttemptService.loginFailed(ip);
             logger.warn("Refresh token inválido: {}", request.refreshToken());
-            return ResponseEntity.status(403).body(new RefreshTokenResponse("Refresh token inválido.", null));
+            throw new BadRequestException("Refresh token inválido.");
+        } catch (BusinessException ex) {
+            loginAttemptService.loginFailed(ip);
+            logger.warn("BusinessException durante refresh: {}", ex.getMessage());
+            throw ex;
         } catch (Exception ex) {
             loginAttemptService.loginFailed(ip);
             logger.error("Erro inesperado durante refresh token: {}", ex.getMessage(), ex);
-            return ResponseEntity.status(500).body(new RefreshTokenResponse("Erro interno no servidor. Tente novamente mais tarde.", null));
+            throw ex;
         }
     }
 
