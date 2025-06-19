@@ -7,22 +7,26 @@ import br.com.wslima.javaspringbootrestapi.persistence.repository.UserRepository
 import br.com.wslima.javaspringbootrestapi.rest.dto.login.LoginRequest;
 import br.com.wslima.javaspringbootrestapi.rest.dto.login.LoginResponse;
 import br.com.wslima.javaspringbootrestapi.rest.dto.user.CreateUserDTO;
+import br.com.wslima.javaspringbootrestapi.rest.dto.user.UserInfoResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/auth")
 public class AuthController {
+
+    private final Logger logger = LoggerFactory.getLogger(AuthController.class);
 
     private final AuthenticationManager authenticationManager;
     private final JwtUtils jwtUtils;
@@ -53,6 +57,21 @@ public class AuthController {
 
         return ResponseEntity.ok(new LoginResponse(token));
     }
+
+    @GetMapping("/me")
+    public UserInfoResponse me(Authentication authentication) {
+        logger.info("AUTHENTICATION {}", "OLA");
+        String email = authentication.getName();
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+
+        Set<String> roles = authentication.getAuthorities()
+                .stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toSet());
+
+        return new UserInfoResponse(user.getName(), user.getEmail(), roles);
+    }
+
 
     @PostMapping("/register")
     public ResponseEntity<String> register(@RequestBody CreateUserDTO createUserDTO) {
