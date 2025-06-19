@@ -1,13 +1,15 @@
-package br.com.wslima.javaspringbootrestapi.rest.controller;
+package br.com.wslima.javaspringbootrestapi.config.security.rest.controller;
 
 import br.com.wslima.javaspringbootrestapi.config.security.JwtUtils;
 import br.com.wslima.javaspringbootrestapi.commons.enums.ERole;
+import br.com.wslima.javaspringbootrestapi.config.security.persistence.model.RefreshToken;
+import br.com.wslima.javaspringbootrestapi.config.security.rest.service.RefreshTokenService;
 import br.com.wslima.javaspringbootrestapi.persistence.model.User;
 import br.com.wslima.javaspringbootrestapi.persistence.repository.UserRepository;
-import br.com.wslima.javaspringbootrestapi.rest.dto.login.LoginRequest;
-import br.com.wslima.javaspringbootrestapi.rest.dto.login.LoginResponse;
-import br.com.wslima.javaspringbootrestapi.rest.dto.login.RefreshTokenRequest;
-import br.com.wslima.javaspringbootrestapi.rest.dto.login.RefreshTokenResponse;
+import br.com.wslima.javaspringbootrestapi.config.security.rest.dto.login.LoginRequest;
+import br.com.wslima.javaspringbootrestapi.config.security.rest.dto.login.LoginResponse;
+import br.com.wslima.javaspringbootrestapi.config.security.rest.dto.login.RefreshTokenRequest;
+import br.com.wslima.javaspringbootrestapi.config.security.rest.dto.login.RefreshTokenResponse;
 import br.com.wslima.javaspringbootrestapi.rest.dto.user.CreateUserDTO;
 import br.com.wslima.javaspringbootrestapi.rest.dto.user.UserInfoResponse;
 import org.slf4j.Logger;
@@ -35,15 +37,17 @@ public class AuthController {
     private final JwtUtils jwtUtils;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenService refreshTokenService;
 
     public AuthController(AuthenticationManager authenticationManager,
                           JwtUtils jwtUtils,
                           UserRepository userRepository,
-                          PasswordEncoder passwordEncoder) {
+                          PasswordEncoder passwordEncoder, RefreshTokenService refreshTokenService) {
         this.authenticationManager = authenticationManager;
         this.jwtUtils = jwtUtils;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.refreshTokenService = refreshTokenService;
     }
 
     @PostMapping("/login")
@@ -57,39 +61,38 @@ public class AuthController {
 
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
         String accessToken = jwtUtils.generateAccessToken(userDetails);
-        String refreshToken = jwtUtils.generateAccessToken(userDetails);
 
-        return ResponseEntity.ok(new LoginResponse(accessToken, refreshToken));
+        User user = userRepository.findByEmail(userDetails.getUsername())
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+
+        RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
+
+        return ResponseEntity.ok(new LoginResponse(accessToken, refreshToken.getToken()));
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<?> refreshToken(@RequestBody RefreshTokenRequest request) {
-        String refreshToken = request.refreshToken();
+    public ResponseEntity<RefreshTokenResponse> refreshToken(@RequestBody RefreshTokenRequest request) {
+        String requestRefreshToken = request.refreshToken();
 
-        if (!jwtUtils.validateToken(refreshToken)) {
-            return ResponseEntity.badRequest().body("Refresh token inválido ou expirado.");
+        try {
+            RefreshToken refreshToken = refreshTokenService.findByToken(requestRefreshToken);
+
+            if (refreshTokenService.isTokenExpired(refreshToken)) {
+                return ResponseEntity.status(403).body(null); // Forbidden: refresh token expirado
+            }
+
+            User user = refreshToken.getUser();
+
+            refreshTokenService.deleteByUser(user);
+            RefreshToken newRefreshToken = refreshTokenService.createRefreshToken(user);
+
+            String newAccessToken = jwtUtils.generateTokenFromEmail(user.getEmail());
+
+            return ResponseEntity.ok(new RefreshTokenResponse(newAccessToken, newRefreshToken.getToken()));
+
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(403).body(null);
         }
-
-        String email = jwtUtils.extractEmailFromToken(refreshToken);
-        UserDetails userDetails = userRepository.findByEmail(email)
-                .map(user -> org.springframework.security.core.userdetails.User
-                        .withUsername(user.getEmail())
-                        .password(user.getPassword())
-                        .authorities(
-                                user.getRoles().stream()
-                                        .map(role -> new SimpleGrantedAuthority(role.name()))
-                                        .toList()
-                        )
-                        .build())
-                .orElse(null);
-
-        if (userDetails == null) {
-            return ResponseEntity.badRequest().body("Usuário não encontrado.");
-        }
-
-        String newAccessToken = jwtUtils.generateAccessToken(userDetails);
-
-        return ResponseEntity.ok(new RefreshTokenResponse(newAccessToken));
     }
 
     @GetMapping("/me")

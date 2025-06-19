@@ -30,6 +30,15 @@ public class JwtUtils {
                 .compact();
     }
 
+    public String generateTokenFromEmail(String email) {
+        return Jwts.builder()
+                .setSubject(email)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
+                .signWith(SIGNATURE_ALGORITHM, jwtSecret)
+                .compact();
+    }
+
     public String generateRefreshToken(UserDetails userDetails) {
         return Jwts.builder()
                 .setSubject(userDetails.getUsername())

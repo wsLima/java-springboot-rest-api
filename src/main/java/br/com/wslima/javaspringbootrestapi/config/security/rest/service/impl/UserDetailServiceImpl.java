@@ -1,4 +1,4 @@
-package br.com.wslima.javaspringbootrestapi.config.security;
+package br.com.wslima.javaspringbootrestapi.config.security.rest.service.impl;
 
 import br.com.wslima.javaspringbootrestapi.persistence.model.User;
 import br.com.wslima.javaspringbootrestapi.persistence.repository.UserRepository;
